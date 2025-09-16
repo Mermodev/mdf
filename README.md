@@ -12,6 +12,6 @@ A terminal-based file manager with basic tagging and color coding system.
 ## Installation
 
 ```bash
-git clone https://github.com/yourusername/mdf-manager.git
+git clone https://github.com/Mermodev/mdf.git
 cd mdf
 makepkg -si
