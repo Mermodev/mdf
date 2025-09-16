@@ -4,11 +4,11 @@ pkgver=1.0.0
 pkgrel=1
 pkgdesc="Mermodev File Manager - A terminal-based file manager with tagging system"
 arch=('x86_64')
-url="https://github.com/yourusername/mdf-manager"
+url="https://github.com/Mermodev/mdf"
 license=('MIT')
 depends=('gcc-libs' 'filesystem' 'nvim')
 makedepends=('git' 'make')
-source=("git+https://github.com/yourusername/mdf-manager.git")
+source=("git+https://github.com/Mermodev/mdf.git")
 sha256sums=('SKIP')
 
 build() {
