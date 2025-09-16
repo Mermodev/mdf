@@ -1,19 +1,19 @@
-  # Maintainer: Mermod <mermodev@gmail.com>
+# Maintainer: Mermod <mermodev@gmail.com>
 pkgname=mdf
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="Mermodev File Manager - A terminal-based file manager with tagging system"
 arch=('x86_64')
-url="https://github.com/Mermodev/mdf"
+url="https://github.com/Mermod/mdf"
 license=('MIT')
 depends=('gcc-libs' 'filesystem' 'nvim')
-makedepends=('git' 'make')
-source=("git+https://github.com/Mermodev/mdf.git")
+makedepends=('git')
+source=("$pkgname::git+https://github.com/Mermod/mdf.git")
 sha256sums=('SKIP')
 
 build() {
   cd "$srcdir/$pkgname"
-  g++ -std=c++12 -O3 -o mdf mdf.cpp
+  g++ -std=c++17 -o mdf mdf.cpp
 }
 
 package() {
