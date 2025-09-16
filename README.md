@@ -1,4 +1,4 @@
-# MDF Manager
+# Mermod file manadgement system
 
 A terminal-based file manager with basic tagging and color coding system.
 
