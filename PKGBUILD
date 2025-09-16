@@ -1,0 +1,23 @@
+# Maintainer: Your Name <your.email@example.com>
+pkgname=mdf-manager
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Mermodev File Manager - A terminal-based file manager with tagging system"
+arch=('x86_64')
+url="https://github.com/yourusername/mdf-manager"
+license=('MIT')
+depends=('gcc-libs' 'filesystem' 'nvim')
+makedepends=('git' 'make')
+source=("git+https://github.com/yourusername/mdf-manager.git")
+sha256sums=('SKIP')
+
+build() {
+  cd "$srcdir/$pkgname"
+  g++ -std=c++12 -O3 -o mdf mdf.cpp
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+  install -Dm755 mdf "$pkgdir/usr/bin/mdf"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
