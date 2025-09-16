@@ -1,4 +1,4 @@
-  # Maintainer: Your Name <your.email@example.com>
+  # Maintainer: Mermod <mermodev@gmail.com>
 pkgname=mdf
 pkgver=1.0.0
 pkgrel=1
