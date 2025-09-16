@@ -1,5 +1,5 @@
-# Maintainer: Your Name <your.email@example.com>
-pkgname=mdf-manager
+  # Maintainer: Your Name <your.email@example.com>
+pkgname=mdf
 pkgver=1.0.0
 pkgrel=1
 pkgdesc="Mermodev File Manager - A terminal-based file manager with tagging system"
