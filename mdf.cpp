@@ -17,24 +17,56 @@ private:
   int NextColorKey=1,NextTagKey=1;
   vector<string> AutoMarkMessages;
 
-  void LoadConfig(){
-    fs::create_directories(ConfigDir);
-    ifstream colors_in(ConfigDir+"/colors.cfg"),tags_in(ConfigDir+"/tags.cfg"),filetags_in(ConfigDir+"/file_tags.cfg"),keys_in(ConfigDir+"/keys.cfg"),automarks_in(ConfigDir+"/automarks.cfg");
-    int k;string n,h;while(colors_in>>k>>n>>h){Colors[k]={k,n,h};ColorNameToKey[n]=k;NextColorKey=max(NextColorKey,k+1);}
-    int tk;string tn,ts;int tp;while(tags_in>>tk>>tn>>ts>>tp){Tags[tk]={tk,tn,ts,tp};TagNameToKey[tn]=tk;NextTagKey=max(NextTagKey,tk+1);}
-    string p;int tkey,ckey;bool am;while(filetags_in>>p>>tkey>>ckey>>am)FileTags[p].push_back({tkey,ckey,am});
-    string amn,atn,acn,aext;while(automarks_in>>amn>>atn>>acn>>aext)AutoMarks.push_back({amn,atn,acn,aext});
-    if(keys_in>>NextColorKey>>NextTagKey){}
+void LoadConfig(){
+  fs::create_directories(ConfigDir);
+  ifstream colors_in(ConfigDir+"/colors.cfg"),tags_in(ConfigDir+"/tags.cfg"),filetags_in(ConfigDir+"/file_tags.cfg"),keys_in(ConfigDir+"/keys.cfg"),automarks_in(ConfigDir+"/automarks.cfg");
+  
+  int k;string n,h;
+  while(colors_in>>k>>n>>h){
+    Colors[k]={k,n,h};
+    ColorNameToKey[n]=k;
+    NextColorKey=max(NextColorKey,k+1);
   }
+  
+  int tk;string tn,ts;int tp;
+  while(tags_in>>tk>>tn>>ts>>tp){
+    Tags[tk]={tk,tn,ts,tp};
+    TagNameToKey[tn]=tk;
+    NextTagKey=max(NextTagKey,tk+1);
+  }
+  
+  string p;int tkey,ckey;bool am;
+  while(filetags_in>>p>>tkey>>ckey>>am){
+    // Normalize the path to ensure consistency
+    fs::path normalized_path = fs::absolute(fs::path(p));
+    FileTags[normalized_path.string()].push_back({tkey,ckey,am});
+  }
+  
+  string amn,atn,acn,aext;
+  while(automarks_in>>amn>>atn>>acn>>aext){
+    AutoMarks.push_back({amn,atn,acn,aext});
+  }
+  
+  if(keys_in>>NextColorKey>>NextTagKey){}
+}
 
   void SaveConfig(){
-    ofstream colors_out(ConfigDir+"/colors.cfg"),tags_out(ConfigDir+"/tags.cfg"),filetags_out(ConfigDir+"/file_tags.cfg"),keys_out(ConfigDir+"/keys.cfg"),automarks_out(ConfigDir+"/automarks.cfg");
-    for(auto&[k,c]:Colors)colors_out<<c.Key<<" "<<c.Name<<" "<<c.Hex<<"\n";
-    for(auto&[k,t]:Tags)tags_out<<t.Key<<" "<<t.Name<<" "<<t.Sign<<" "<<t.Priority<<"\n";
-    for(auto&[p,ft]:FileTags)for(auto&t:ft)filetags_out<<p<<" "<<t.TagKey<<" "<<t.ColorKey<<" "<<t.AutoMarked<<"\n";
-    for(auto&am:AutoMarks)automarks_out<<am.Name<<" "<<am.TagName<<" "<<am.ColorName<<" "<<am.Extension<<"\n";
-    keys_out<<NextColorKey<<" "<<NextTagKey<<"\n";
+  ofstream colors_out(ConfigDir+"/colors.cfg"),tags_out(ConfigDir+"/tags.cfg"),filetags_out(ConfigDir+"/file_tags.cfg"),keys_out(ConfigDir+"/keys.cfg"),automarks_out(ConfigDir+"/automarks.cfg");
+  
+  for(auto&[k,c]:Colors) colors_out<<c.Key<<" "<<c.Name<<" "<<c.Hex<<"\n";
+  for(auto&[k,t]:Tags) tags_out<<t.Key<<" "<<t.Name<<" "<<t.Sign<<" "<<t.Priority<<"\n";
+  
+  for(auto&[p,ft]:FileTags){
+    for(auto&t:ft){
+      // Use absolute paths for consistency
+      fs::path abs_path = fs::absolute(fs::path(p));
+      filetags_out<<abs_path.string()<<" "<<t.TagKey<<" "<<t.ColorKey<<" "<<t.AutoMarked<<"\n";
+    }
   }
+  
+  for(auto&am:AutoMarks) automarks_out<<am.Name<<" "<<am.TagName<<" "<<am.ColorName<<" "<<am.Extension<<"\n";
+  keys_out<<NextColorKey<<" "<<NextTagKey<<"\n";
+}
 
   string HexToANSI(const string&h){
     if(h.empty())return"\033[0m";
@@ -62,47 +94,66 @@ private:
     return parts.size()<=2?CurrentDir:(parts[parts.size()-2]+"/"+parts.back());
   }
 
-  void AutoMarkFile(const string&path){
-    string ext=fs::path(path).extension().string();
-    if(ext.empty()&&fs::is_directory(path))ext="/";
+void AutoMarkFile(const string&path){
+  string abs_path = fs::absolute(fs::path(path)).string();
+  string ext=fs::path(abs_path).extension().string();
+  if(ext.empty()&&fs::is_directory(abs_path)) ext="/";
 
-    // Remove any auto-marked tags that no longer have matching rules
-    auto it=FileTags.find(path);
-    if(it!=FileTags.end()){
-      it->second.erase(remove_if(it->second.begin(),it->second.end(),[&](auto&ft){
-        if(ft.AutoMarked){
-          bool rule_exists=false;
-          for(auto&am:AutoMarks){
-            if(am.Extension==ext&&TagNameToKey[am.TagName]==ft.TagKey&&ColorNameToKey[am.ColorName]==ft.ColorKey){
-              rule_exists=true;break;
-            }
-          }
-          return !rule_exists;
-        }
-        return false;
-      }),it->second.end());
-      if(it->second.empty())FileTags.erase(it);
-    }
-
-    for(auto&am:AutoMarks){
-      if(am.Extension==ext&&TagNameToKey.find(am.TagName)!=TagNameToKey.end()&&ColorNameToKey.find(am.ColorName)!=ColorNameToKey.end()){
-        int tkey=TagNameToKey[am.TagName],ckey=ColorNameToKey[am.ColorName];
-        bool already_marked=false;
-        if(FileTags.find(path)!=FileTags.end()){
-          for(auto&ft:FileTags[path]){
-            if(ft.TagKey==tkey&&ft.ColorKey==ckey){
-              already_marked=true;ft.AutoMarked=true;break;
-            }
-          }
-        }
-        if(!already_marked){
-          FileTags[path].push_back({tkey,ckey,true});
-          AutoMarkMessages.push_back("\033[33mAuto-marked: "+path+" -> "+am.TagName+":"+am.ColorName+"\033[0m");
-        }
+  // Check if file has any manual tags
+  bool has_manual_tags = false;
+  if(FileTags.find(abs_path) != FileTags.end()){
+    for(auto& ft : FileTags[abs_path]){
+      if(!ft.AutoMarked){
+        has_manual_tags = true;
         break;
       }
     }
   }
+
+  // Don't auto-mark files that have manual tags
+  if(has_manual_tags) return;
+
+  // Remove any auto-marked tags that no longer have matching rules
+  auto it=FileTags.find(abs_path);
+  if(it!=FileTags.end()){
+    it->second.erase(remove_if(it->second.begin(),it->second.end(),[&](auto&ft){
+      if(ft.AutoMarked){
+        bool rule_exists=false;
+        for(auto&am:AutoMarks){
+          if(am.Extension==ext&&TagNameToKey[am.TagName]==ft.TagKey&&ColorNameToKey[am.ColorName]==ft.ColorKey){
+            rule_exists=true;break;
+          }
+        }
+        return !rule_exists;
+      }
+      return false;
+    }),it->second.end());
+    if(it->second.empty()) FileTags.erase(it);
+  }
+
+  for(auto&am:AutoMarks){
+    if(am.Extension==ext&&TagNameToKey.find(am.TagName)!=TagNameToKey.end()&&ColorNameToKey.find(am.ColorName)!=ColorNameToKey.end()){
+      int tkey=TagNameToKey[am.TagName],ckey=ColorNameToKey[am.ColorName];
+      bool already_marked=false;
+      
+      if(FileTags.find(abs_path)!=FileTags.end()){
+        for(auto&ft:FileTags[abs_path]){
+          if(ft.TagKey==tkey&&ft.ColorKey==ckey){
+            already_marked=true;
+            ft.AutoMarked=true;
+            break;
+          }
+        }
+      }
+      
+      if(!already_marked){
+        FileTags[abs_path].push_back({tkey,ckey,true});
+        AutoMarkMessages.push_back("\033[33mAuto-marked: "+abs_path+" -> "+am.TagName+":"+am.ColorName+"\033[0m");
+      }
+      break;
+    }
+  }
+}
 
   void TreeRecursive(const string&d,int depth,bool last[]){
     vector<string>entries;for(auto&e:fs::directory_iterator(d)){
@@ -307,18 +358,34 @@ public:
     SaveConfig();
   }
 
-  void Mark(string p,string t,string c){
-    AutoMarkMessages.clear();
-    if(p.empty()||t.empty()||c.empty()){cout<<"\033[31mUsage: mark <file> <tag> <color>\033[0m\n";return;}
-    string ap=AbsPath(p);AutoMarkFile(ap);
-    if(TagNameToKey.find(t)==TagNameToKey.end()){cout<<"\033[31mTag '"<<t<<"' not found.\033[0m\n";return;}
-    if(ColorNameToKey.find(c)==ColorNameToKey.end()){cout<<"\033[31mColor '"<<c<<"' not found.\033[0m\n";return;}
-    int tkey=TagNameToKey[t],ckey=ColorNameToKey[c];
-    if([&](){for(auto&ft:FileTags[ap])if(ft.TagKey==tkey)return true;return false;}()){cout<<"\033[33mTag already exists.\033[0m\n";return;}
-    FileTags[ap].push_back({tkey,ckey,false});cout<<"\033[32mMarked: "<<ap<<" -> "<<t<<":"<<c<<"\033[0m\n";
-    SaveConfig();
-    ShowAutoMarkMessages();
-  }
+ void Mark(string p,string t,string c){
+  AutoMarkMessages.clear();
+  if(p.empty()||t.empty()||c.empty()){cout<<"\033[31mUsage: mark <file> <tag> <color>\033[0m\n";return;}
+  
+  string abs_path = fs::absolute(fs::path(AbsPath(p))).string();
+  AutoMarkFile(abs_path);
+  
+  if(TagNameToKey.find(t)==TagNameToKey.end()){cout<<"\033[31mTag '"<<t<<"' not found.\033[0m\n";return;}
+  if(ColorNameToKey.find(c)==ColorNameToKey.end()){cout<<"\033[31mColor '"<<c<<"' not found.\033[0m\n";return;}
+  
+  int tkey=TagNameToKey[t],ckey=ColorNameToKey[c];
+  
+  // Check if this exact tag already exists (manual or auto)
+  if([&](){
+    auto it = FileTags.find(abs_path);
+    if(it != FileTags.end()){
+      for(auto&ft:it->second){
+        if(ft.TagKey==tkey && ft.ColorKey==ckey) return true;
+      }
+    }
+    return false;
+  }()){cout<<"\033[33mTag already exists.\033[0m\n";return;}
+  
+  FileTags[abs_path].push_back({tkey,ckey,false});
+  cout<<"\033[32mMarked: "<<abs_path<<" -> "<<t<<":"<<c<<"\033[0m\n";
+  SaveConfig();
+  ShowAutoMarkMessages();
+}
 
   void Unmark(string p,string t){
     AutoMarkMessages.clear();
